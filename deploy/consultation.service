@@ -4,6 +4,7 @@ After=network.target
 
 [Service]
 ExecStart=/usr/bin/python3 /opt/richardwinfred/consultation-server.py
+Environment=PYTHONDONTWRITEBYTECODE=1
 EnvironmentFile=-/etc/richardwinfred/mail.env
 Restart=on-failure
 User=www-data
