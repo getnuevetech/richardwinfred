@@ -87,21 +87,26 @@ def save(booking):
     return path
 
 
+def smtp_token(value):
+    # Copied app passwords often include a non-breaking space, which Gmail's
+    # login cannot encode as ASCII.
+    return "".join(ch for ch in (value or "") if ch.isascii() and not ch.isspace())
+
+
 def smtp_settings():
-    password = os.environ.get("SMTP_PASSWORD", "").replace(" ", "")
     return {
         "host": os.environ.get("SMTP_HOST", "smtp.gmail.com"),
         "port": int(os.environ.get("SMTP_PORT", "587")),
-        "user": os.environ.get("SMTP_USER", "info@richardwinfred.com"),
-        "password": password,
-        "to": os.environ.get("CONSULT_TO", "info@richardwinfred.com"),
+        "user": smtp_token(os.environ.get("SMTP_USER", "info@richardwinfred.com")),
+        "password": smtp_token(os.environ.get("SMTP_PASSWORD", "")),
+        "to": smtp_token(os.environ.get("CONSULT_TO", "info@richardwinfred.com")),
     }
 
 
 def send_smtp(booking):
     settings = smtp_settings()
-    if not settings["password"]:
-        raise RuntimeError("The Gmail app password is not set on the server yet.")
+    if len(settings["password"]) != 16:
+        raise RuntimeError("The Gmail app password must be 16 letters. Check /etc/richardwinfred/mail.env.")
     message = EmailMessage()
     message["Subject"] = f"Consultation request from {booking['name']}"
     message["From"] = settings["user"]
