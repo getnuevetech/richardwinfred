@@ -66,29 +66,37 @@ dig +short www.richardwinfred.com
 
 Canonical, Open Graph, `robots.txt`, and `sitemap.xml` use `https://richardwinfred.com/`. If the live hostname is different, change those before the first publish.
 
-### 5. Copy the site onto the server
+### 5. Confirm the site files
 
-The GitHub repo is private, so the instance cannot clone it on its own. From your own machine, in a checkout that contains `deploy/lightsail-setup.sh`:
+The live files belong in `/var/www/richardwinfred`, with `index.html` directly inside that directory. When they are already there, leave them. Do not copy the site to a second folder.
 
-```bash
-rsync -az --exclude '.git/' ./ ubuntu@STATIC_IP:/home/ubuntu/richardwinfred/
-```
-
-SSH uses the Lightsail default key for the instance region. Download it from **Account → SSH keys** if you do not already have it, then:
+SSH in with the Lightsail default key (Account → SSH keys) or the browser SSH button on the instance **Connect** tab:
 
 ```bash
 chmod 400 ~/Downloads/LightsailDefaultKey-REGION.pem
 ssh -i ~/Downloads/LightsailDefaultKey-REGION.pem ubuntu@STATIC_IP
 ```
 
-The browser SSH button on the instance **Connect** tab also works. Use `rsync` or `scp` for the files; the browser session has no convenient upload.
-
-### 6. Install nginx and the certificate
-
 On the server:
 
 ```bash
-cd /home/ubuntu/richardwinfred
+ls /var/www/richardwinfred/index.html
+```
+
+The setup script has to be on the server as well. If `deploy/lightsail-setup.sh` is not next to the site, copy only that folder from your own checkout:
+
+```bash
+rsync -az ./deploy/ ubuntu@STATIC_IP:/var/www/richardwinfred/deploy/
+```
+
+nginx refuses requests for `/deploy/` and `/.git`, so those files are not part of the public site.
+
+### 6. Install nginx and the certificate
+
+On the server, from the directory that already holds the site:
+
+```bash
+cd /var/www/richardwinfred
 sudo WWW=1 ./deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.com
 ```
 
@@ -98,7 +106,7 @@ sudo WWW=1 ./deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.co
 sudo ./deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.com
 ```
 
-The script installs nginx, Certbot, and rsync, publishes the public files to `/var/www/richardwinfred`, and requests a Let's Encrypt certificate. HTTP then redirects to HTTPS. If the certificate step fails, fix DNS or the firewall and run the same command again.
+The script installs nginx and Certbot, keeps the files already in `/var/www/richardwinfred`, and requests a Let's Encrypt certificate. HTTP then redirects to HTTPS. If the certificate step fails, fix DNS or the firewall and run the same command again.
 
 Confirm renewal is scheduled:
 
@@ -127,7 +135,7 @@ From your own machine, in the site checkout:
 ./deploy/push.sh ubuntu@STATIC_IP
 ```
 
-That replaces the files in `/var/www/richardwinfred` and reloads nginx. The Ubuntu user on Lightsail has passwordless sudo, which the script uses. It does not request a new certificate.
+That replaces the files in `/var/www/richardwinfred` and reloads nginx. Run it when the checkout on your machine should become the live site. The Ubuntu user on Lightsail has passwordless sudo, which the script uses. It does not request a new certificate.
 
 ### What the server does
 

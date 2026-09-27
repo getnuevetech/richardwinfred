@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # One-time setup for an Ubuntu Lightsail instance (OS-only blueprint).
-# Run on the server, from a copy of this repo:
-#   sudo ./deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.com
-# Include www only after that DNS record exists:
+# The public site lives in /var/www/richardwinfred. When this script is run
+# from that directory, or index.html is already there, those files stay put.
+#   cd /var/www/richardwinfred
 #   sudo WWW=1 ./deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.com
 set -euo pipefail
 
@@ -32,13 +32,23 @@ apt-get update
 apt-get install -y nginx certbot python3-certbot-nginx rsync
 
 install -d -m 755 "$WEB_ROOT"
-rsync -a --delete \
-  --exclude '.git/' \
-  --exclude 'deploy/' \
-  --exclude 'README.md' \
-  --exclude '.gitignore' \
-  --exclude '.DS_Store' \
-  "$SRC"/ "$WEB_ROOT"/
+SRC_REAL="$(readlink -f "$SRC")"
+WEB_REAL="$(readlink -f "$WEB_ROOT")"
+if [[ "$SRC_REAL" == "$WEB_REAL" || -f "$WEB_ROOT/index.html" ]]; then
+  echo "Using the site files already in $WEB_ROOT"
+else
+  rsync -a --delete \
+    --exclude '.git/' \
+    --exclude 'deploy/' \
+    --exclude 'README.md' \
+    --exclude '.gitignore' \
+    --exclude '.DS_Store' \
+    "$SRC"/ "$WEB_ROOT"/
+fi
+if [[ ! -f "$WEB_ROOT/index.html" ]]; then
+  echo "Expected the homepage at $WEB_ROOT/index.html" >&2
+  exit 1
+fi
 chown -R www-data:www-data "$WEB_ROOT"
 
 install -d -m 755 /etc/nginx/snippets
