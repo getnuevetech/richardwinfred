@@ -9,19 +9,59 @@ richardwinfred-site/
   assets/js/main.js     Scroll-reveal animations
   assets/img/           Brand images (logo, logo-white, photography from company brochure)
 
-## Deploy
-Upload the ENTIRE folder contents to any static web host:
+## Deploy on AWS Lightsail
 
-1. cPanel / traditional hosting (e.g., GoDaddy, HostGator):
-   - Upload all files/folders to public_html (or your domain root) via File Manager or FTP.
-   - index.html must sit at the domain root: https://yourdomain.com/ should load it directly.
+This is a static site. Serve it with nginx on an Ubuntu Lightsail instance. No build step, database, or Node process.
 
-2. Netlify / Vercel / Cloudflare Pages:
-   - Drag-and-drop the folder onto the dashboard, or connect a git repo.
-   - No build command needed; publish directory = the site root.
+The GitHub repo is private, so the instance should not clone it. Copy the files up with `rsync` (or Lightsail's browser SSH upload), then run the setup script on the server.
 
-3. GitHub Pages:
-   - Push these files to a repo, enable Pages on the main branch root.
+### Instance
+- Blueprint: **Ubuntu 24.04**, OS only. The setup script targets Ubuntu's nginx paths, not a Bitnami stack.
+- Size: the smallest plan is enough. There is no application runtime to keep in memory.
+- Attach a **static IP** before DNS is pointed here. A static IP is free while it is attached to a running instance.
+- Lightsail networking firewall: allow SSH (22) from your IP, plus HTTP (80) and HTTPS (443) from anywhere. Certbot needs port 80.
+- Leave existing **MX records** alone. This server only answers for the website. Email for `info@richardwinfred.com` stays with the current mail host.
+
+### DNS
+Create these records at the domain registrar, aimed at the static IP:
+
+- `A` `@` → static IP
+- `A` `www` → static IP
+
+Wait until they resolve, then request the certificate. Canonical, Open Graph, `robots.txt`, and `sitemap.xml` use `https://richardwinfred.com/`. If the live hostname is different, change those three files before the first publish.
+
+### First boot
+Copy this repo onto the instance (for example into `/home/ubuntu/richardwinfred`), then:
+
+```bash
+sudo ./deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.com
+```
+
+That installs nginx and Certbot, publishes the site to `/var/www/richardwinfred`, and requests a Let's Encrypt certificate. Add `WWW=1` before the command only after the `www` record resolves:
+
+```bash
+sudo WWW=1 ./deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.com
+```
+
+### Later updates
+From a machine that can SSH to the instance:
+
+```bash
+./deploy/push.sh ubuntu@STATIC_IP
+```
+
+The Ubuntu user on Lightsail has passwordless sudo, which the script uses for `rsync`.
+
+### What the server does
+- nginx serves the files. HTML is not cached; files under `assets/` cache for one day. Asset filenames are not hashed, so rename a file when replacing it if a one-day delay is a problem.
+- HTTP redirects to HTTPS after Certbot runs.
+- Response headers set a content security policy, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and `Permissions-Policy`. The policy allows Google Fonts and same-origin images, scripts, and styles. It does not allow a contact form post.
+- Unknown URLs return `404.html`.
+
+HSTS is not turned on. Add it only after HTTPS has been confirmed on the real domain.
+
+### Other static hosts
+The same files can still be uploaded to any static host (cPanel `public_html`, Netlify, Cloudflare Pages). `index.html` has to be at the domain root. Those hosts will not apply the nginx headers in `deploy/nginx/`.
 
 ## Notes
 - Fonts load from Google Fonts (Fraunces + Inter). Site degrades gracefully to system fonts offline.
