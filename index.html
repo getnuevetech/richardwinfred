@@ -21,7 +21,7 @@
 <a class="skip" href="#content">Skip to content</a>
 
 <header><div class="wrap nav">
-  <a class="logo" href="#top" aria-label="Richard Winfred Esi, LLC home"><img src="assets/img/logo.png" alt="Richard Winfred Esi, LLC" width="640" height="213"></a>
+  <a class="logo" href="#top" aria-label="Richard Winfred Esi, LLC home"><img src="assets/img/logo.png" alt="Richard Winfred Esi, LLC" width="213" height="32"></a>
   <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><span></span><span></span><span></span></button>
   <nav id="site-nav" class="nav-links" aria-label="Primary"><a href="#services">Services</a><a href="#work">How we work</a><a href="#clients">Clients</a></nav>
   <a class="btn btn-p" href="#contact">Book a consultation</a>
@@ -103,15 +103,29 @@
 </div></section>
 
 <section class="cta" id="contact"><div class="wrap cta-in">
-  <div class="reveal"><h2>Let's talk about your technology environment.</h2><p>Project, incident, multi-site, or ongoing support — tell us what you're solving.</p></div>
-  <div class="reveal"><a class="btn btn-w" href="mailto:info@richardwinfred.com">Book a consultation</a><a class="tel" href="tel:+12812130055">+1 281 213 0055</a></div>
+  <div class="reveal"><h2>Let's talk about your technology environment.</h2><p>Project, incident, multi-site, or ongoing support — tell us what you're solving.</p><p class="cta-phone"><a class="tel" href="tel:+12812130055">+1 281 213 0055</a></p></div>
+  <form class="book reveal" id="consult-form" action="/api/consultation" method="post">
+    <label for="consult-name">Name</label>
+    <input id="consult-name" name="name" required maxlength="80" autocomplete="name">
+    <label for="consult-email">Email</label>
+    <input id="consult-email" name="email" type="email" required maxlength="120" autocomplete="email">
+    <label for="consult-phone">Phone</label>
+    <input id="consult-phone" name="phone" type="tel" maxlength="40" autocomplete="tel">
+    <label for="consult-company">Company</label>
+    <input id="consult-company" name="company" maxlength="80" autocomplete="organization">
+    <label for="consult-message">What do you need?</label>
+    <textarea id="consult-message" name="message" required maxlength="2000"></textarea>
+    <div class="hp"><label for="consult-website">Website</label><input id="consult-website" name="website" tabindex="-1" autocomplete="off"></div>
+    <button class="btn btn-w" type="submit">Book a consultation</button>
+    <p class="form-status" id="form-status" role="status"></p>
+  </form>
 </div></section>
 
 </main>
 
 <footer><div class="wrap">
   <div class="fg">
-    <div><img class="fb-logo" src="assets/img/logo-white.png" alt="Richard Winfred Esi, LLC" width="640" height="213"><p>Technology consulting, infrastructure, implementation, and support for organizations that need more than a vendor.</p></div>
+    <div><img class="fb-logo" src="assets/img/logo-white.png" alt="Richard Winfred Esi, LLC" width="173" height="26"><p>Technology consulting, infrastructure, implementation, and support for organizations that need more than a vendor.</p></div>
     <div><h4>Services</h4><ul><li><a href="#services">Consulting</a></li><li><a href="#services">Infrastructure</a></li><li><a href="#services">Support &amp; field</a></li><li><a href="#services">Facility tech</a></li></ul></div>
     <div><h4>Company</h4><ul><li><a href="#work">How we work</a></li><li><a href="#clients">Clients</a></li><li><a href="#contact">Contact</a></li></ul></div>
     <div><h4>Contact</h4><ul><li><a href="mailto:info@richardwinfred.com">info@richardwinfred.com</a></li><li><a href="tel:+12812130055">+1 281 213 0055</a></li><li>Houston, Texas</li></ul></div>

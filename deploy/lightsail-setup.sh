@@ -51,6 +51,13 @@ if [[ ! -f "$WEB_ROOT/index.html" ]]; then
 fi
 chown -R www-data:www-data "$WEB_ROOT"
 
+install -d -m 755 /opt/richardwinfred /var/lib/richardwinfred/consultations
+install -m 644 "$SRC/deploy/consultation-server.py" /opt/richardwinfred/consultation-server.py
+install -m 644 "$SRC/deploy/consultation.service" /etc/systemd/system/richardwinfred-consultation.service
+chown -R www-data:www-data /var/lib/richardwinfred
+systemctl daemon-reload
+systemctl enable --now richardwinfred-consultation
+
 install -d -m 755 /etc/nginx/snippets
 install -m 644 "$SRC/deploy/nginx/security-headers.conf" /etc/nginx/snippets/richardwinfred-headers.conf
 sed "s/__SERVER_NAMES__/${NAMES}/g" "$SRC/deploy/nginx/richardwinfred.conf" > /etc/nginx/sites-available/richardwinfred
