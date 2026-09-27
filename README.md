@@ -83,13 +83,17 @@ On the server:
 ls /var/www/richardwinfred/index.html
 ```
 
-The setup script has to be on the server as well. If `deploy/lightsail-setup.sh` is not next to the site, copy only that folder from your own checkout:
+The setup script is not one of the public site files, so an upload of the website alone does not include it. `sudo: ./deploy/lightsail-setup.sh: command not found` means that file is not in this directory. From your own checkout, copy only the `deploy` folder:
 
 ```bash
 rsync -az ./deploy/ ubuntu@STATIC_IP:/var/www/richardwinfred/deploy/
 ```
 
-nginx refuses requests for `/deploy/` and `/.git`, so those files are not part of the public site.
+nginx refuses requests for `/deploy/` and `/.git`, so those files are not part of the public site. On the server, `sudo bash` runs the script even when the execute bit was lost in the upload:
+
+```bash
+ls /var/www/richardwinfred/deploy/lightsail-setup.sh
+```
 
 ### 6. Install nginx and the certificate
 
@@ -97,13 +101,13 @@ On the server, from the directory that already holds the site:
 
 ```bash
 cd /var/www/richardwinfred
-sudo WWW=1 ./deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.com
+sudo WWW=1 bash deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.com
 ```
 
 `WWW=1` includes `www.richardwinfred.com` on the certificate. Omit it when that DNS record does not exist yet:
 
 ```bash
-sudo ./deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.com
+sudo bash deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.com
 ```
 
 The script installs nginx and Certbot, keeps the files already in `/var/www/richardwinfred`, and requests a Let's Encrypt certificate. HTTP then redirects to HTTPS. If the certificate step fails, fix DNS or the firewall and run the same command again.

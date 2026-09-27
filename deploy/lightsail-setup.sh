@@ -3,11 +3,11 @@
 # The public site lives in /var/www/richardwinfred. When this script is run
 # from that directory, or index.html is already there, those files stay put.
 #   cd /var/www/richardwinfred
-#   sudo WWW=1 ./deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.com
+#   sudo WWW=1 bash deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.com
 set -euo pipefail
 
 if [[ "${EUID}" -ne 0 ]]; then
-  echo "Run as root: sudo ./deploy/lightsail-setup.sh example.com you@example.com" >&2
+  echo "Run as root: sudo bash deploy/lightsail-setup.sh example.com you@example.com" >&2
   exit 1
 fi
 
