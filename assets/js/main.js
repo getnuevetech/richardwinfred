@@ -44,7 +44,7 @@ if (consultForm && formStatus) {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload.ok) {
-        throw new Error(payload.error || 'Please try again.');
+        throw new Error(payload.error || 'The booking service did not accept the form. Reload the page and try again.');
       }
       consultForm.reset();
       formStatus.textContent = 'Request received. We will reply by email.';

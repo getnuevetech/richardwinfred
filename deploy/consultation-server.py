@@ -5,19 +5,19 @@ import html
 import json
 import os
 import re
+import smtplib
+import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
+from email.message import EmailMessage
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 HOST = "127.0.0.1"
 PORT = 8787
-TO = os.environ.get("CONSULT_TO", "info@richardwinfred.com")
 STORE = Path(os.environ.get("CONSULT_STORE", "/var/lib/richardwinfred/consultations"))
-DELIVER = os.environ.get("CONSULT_DELIVER", "formsubmit")
+DELIVER = os.environ.get("CONSULT_DELIVER", "smtp")
 MAX_BODY = 32_000
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 HITS = {}
@@ -87,37 +87,54 @@ def save(booking):
     return path
 
 
-def send_formsubmit(booking):
-    payload = json.dumps({
-        "name": booking["name"],
-        "email": booking["email"],
-        "phone": booking["phone"],
-        "company": booking["company"],
-        "message": booking["message"],
-        "_subject": "Consultation request from the website",
-        "_template": "table",
-        "_captcha": "false",
-        "_replyto": booking["email"],
-    }).encode("utf-8")
-    request = urllib.request.Request(
-        "https://formsubmit.co/ajax/" + urllib.parse.quote(TO),
-        data=payload,
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
-        method="POST",
+def smtp_settings():
+    password = os.environ.get("SMTP_PASSWORD", "").replace(" ", "")
+    return {
+        "host": os.environ.get("SMTP_HOST", "smtp.gmail.com"),
+        "port": int(os.environ.get("SMTP_PORT", "587")),
+        "user": os.environ.get("SMTP_USER", "info@richardwinfred.com"),
+        "password": password,
+        "to": os.environ.get("CONSULT_TO", "info@richardwinfred.com"),
+    }
+
+
+def send_smtp(booking):
+    settings = smtp_settings()
+    if not settings["password"]:
+        raise RuntimeError("The Gmail app password is not set on the server yet.")
+    message = EmailMessage()
+    message["Subject"] = f"Consultation request from {booking['name']}"
+    message["From"] = settings["user"]
+    message["To"] = settings["to"]
+    message["Reply-To"] = booking["email"]
+    message.set_content(
+        "\n".join([
+            f"Name: {booking['name']}",
+            f"Email: {booking['email']}",
+            f"Phone: {booking['phone'] or '—'}",
+            f"Company: {booking['company'] or '—'}",
+            "",
+            booking["message"],
+        ])
     )
-    with urllib.request.urlopen(request, timeout=20) as response:
-        body = response.read().decode("utf-8", "replace")
-        if response.status >= 400:
-            raise RuntimeError(body[:300])
-        return body
+    try:
+        with smtplib.SMTP(settings["host"], settings["port"], timeout=20) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
+            smtp.login(settings["user"], settings["password"])
+            smtp.send_message(message)
+    except smtplib.SMTPAuthenticationError as exc:
+        raise RuntimeError("Gmail rejected the app password for info@richardwinfred.com.") from exc
+    except (OSError, smtplib.SMTPException) as exc:
+        print(f"consultation mail failed: {type(exc).__name__}", file=sys.stderr, flush=True)
+        raise RuntimeError("Gmail did not accept the message. Try again in a moment.") from exc
 
 
 def deliver(booking):
     if DELIVER == "file":
         return "saved"
-    if DELIVER == "formsubmit":
-        return send_formsubmit(booking)
-    raise RuntimeError("Mail delivery is not configured.")
+    return send_smtp(booking)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -140,7 +157,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             save(booking)
             deliver(booking)
-        except (OSError, urllib.error.URLError, RuntimeError):
+        except RuntimeError as exc:
+            self.reply(502, {"ok": False, "error": str(exc)})
+            return
+        except OSError:
             self.reply(502, {"ok": False, "error": "We could not send that just now. Email info@richardwinfred.com or call +1 281 213 0055."})
             return
         self.reply(200, {"ok": True})

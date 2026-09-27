@@ -51,9 +51,12 @@ if [[ ! -f "$WEB_ROOT/index.html" ]]; then
 fi
 chown -R www-data:www-data "$WEB_ROOT"
 
-install -d -m 755 /opt/richardwinfred /var/lib/richardwinfred/consultations
+install -d -m 755 /opt/richardwinfred /var/lib/richardwinfred/consultations /etc/richardwinfred
 install -m 644 "$SRC/deploy/consultation-server.py" /opt/richardwinfred/consultation-server.py
 install -m 644 "$SRC/deploy/consultation.service" /etc/systemd/system/richardwinfred-consultation.service
+if [[ ! -f /etc/richardwinfred/mail.env ]]; then
+  install -m 600 "$SRC/deploy/mail.env.example" /etc/richardwinfred/mail.env
+fi
 chown -R www-data:www-data /var/lib/richardwinfred
 systemctl daemon-reload
 systemctl enable --now richardwinfred-consultation
