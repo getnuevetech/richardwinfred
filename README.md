@@ -9,19 +9,147 @@ richardwinfred-site/
   assets/js/main.js     Scroll-reveal animations
   assets/img/           Brand images (logo, logo-white, photography from company brochure)
 
-## Deploy
-Upload the ENTIRE folder contents to any static web host:
+## Deploy on AWS Lightsail
 
-1. cPanel / traditional hosting (e.g., GoDaddy, HostGator):
-   - Upload all files/folders to public_html (or your domain root) via File Manager or FTP.
-   - index.html must sit at the domain root: https://yourdomain.com/ should load it directly.
+This is a static site. The server is a small Ubuntu Lightsail instance running nginx. There is no build step, database, or Node process. `deploy/lightsail-setup.sh` installs nginx into Ubuntu's normal paths (`/etc/nginx`, `/var/www`), so the instance has to be the OS-only Ubuntu blueprint.
 
-2. Netlify / Vercel / Cloudflare Pages:
-   - Drag-and-drop the folder onto the dashboard, or connect a git repo.
-   - No build command needed; publish directory = the site root.
+Do the steps in this order. The certificate request fails if DNS is not already pointing at the static IP, or if ports 80 and 443 are still closed.
 
-3. GitHub Pages:
-   - Push these files to a repo, enable Pages on the main branch root.
+### 1. Create the instance
+
+1. Open the [Lightsail console](https://lightsail.aws.amazon.com/).
+2. Choose **Create instance**.
+3. Pick the region closest to the audience. For a Houston site, US East (Ohio) or US East (N. Virginia) is the usual choice. The region cannot be changed later.
+4. Platform: **Linux/Unix**.
+5. Blueprint: open the **OS Only** tab and choose **Ubuntu 24.04 LTS**.
+6. Leave the launch script empty. Keep the default SSH key.
+7. Name the instance `richardwinfred-web`.
+8. Choose the smallest plan. The site is static files, so extra memory is unused.
+9. Choose **Create instance** and wait until the state is **Running**.
+
+### 2. Attach a static IP
+
+1. Open the instance, then the **Networking** tab.
+2. Under **Public IPv4 address**, choose **Attach static IP**, then **Create static IP**.
+3. Name it `richardwinfred-ip` and attach it to `richardwinfred-web`.
+4. Copy the address. A static IP stays free while it is attached to a running instance. Releasing it, or leaving it unattached, is what starts the charge.
+
+### 3. Open the firewall
+
+On the same **Networking** tab, under **IPv4 Firewall**, add any of these rules that are missing:
+
+| Application | Protocol | Port |
+| --- | --- | --- |
+| SSH | TCP | 22 |
+| HTTP | TCP | 80 |
+| HTTPS | TCP | 443 |
+
+Port 80 has to be open before the certificate request. Restrict SSH to your own IP when you know it.
+
+### 4. Point DNS at that IP
+
+Add the records at the DNS host that already serves the domain. Leave the nameservers and the MX records as they are. This server only answers for the website; mail for `info@richardwinfred.com` stays with the current mail host.
+
+| Type | Host | Value |
+| --- | --- | --- |
+| A | `@` | the static IP |
+| A | `www` | the static IP |
+
+If an `AAAA` record for `@` or `www` points somewhere else, update or remove it. Otherwise some visitors will reach the old address.
+
+Wait until both names resolve to the static IP:
+
+```bash
+dig +short richardwinfred.com
+dig +short www.richardwinfred.com
+```
+
+Canonical, Open Graph, `robots.txt`, and `sitemap.xml` use `https://richardwinfred.com/`. If the live hostname is different, change those before the first publish.
+
+### 5. Confirm the site files
+
+The live files belong in `/var/www/richardwinfred`, with `index.html` directly inside that directory. When they are already there, leave them. Do not copy the site to a second folder.
+
+SSH in with the Lightsail default key (Account → SSH keys) or the browser SSH button on the instance **Connect** tab:
+
+```bash
+chmod 400 ~/Downloads/LightsailDefaultKey-REGION.pem
+ssh -i ~/Downloads/LightsailDefaultKey-REGION.pem ubuntu@STATIC_IP
+```
+
+On the server:
+
+```bash
+ls /var/www/richardwinfred/index.html
+```
+
+The setup script is not one of the public site files, so an upload of the website alone does not include it. `sudo: ./deploy/lightsail-setup.sh: command not found` means that file is not in this directory. From your own checkout, copy only the `deploy` folder:
+
+```bash
+rsync -az ./deploy/ ubuntu@STATIC_IP:/var/www/richardwinfred/deploy/
+```
+
+nginx refuses requests for `/deploy/` and `/.git`, so those files are not part of the public site. On the server, `sudo bash` runs the script even when the execute bit was lost in the upload:
+
+```bash
+ls /var/www/richardwinfred/deploy/lightsail-setup.sh
+```
+
+### 6. Install nginx and the certificate
+
+On the server, from the directory that already holds the site:
+
+```bash
+cd /var/www/richardwinfred
+sudo WWW=1 bash deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.com
+```
+
+`WWW=1` includes `www.richardwinfred.com` on the certificate. Omit it when that DNS record does not exist yet:
+
+```bash
+sudo bash deploy/lightsail-setup.sh richardwinfred.com info@richardwinfred.com
+```
+
+The script installs nginx and Certbot, keeps the files already in `/var/www/richardwinfred`, and requests a Let's Encrypt certificate. HTTP then redirects to HTTPS. If the certificate step fails, fix DNS or the firewall and run the same command again.
+
+Confirm renewal is scheduled:
+
+```bash
+sudo systemctl status certbot.timer
+sudo certbot renew --dry-run
+```
+
+### 7. Check the live site
+
+From your own machine:
+
+```bash
+curl -sI https://richardwinfred.com/ | head
+curl -sI http://richardwinfred.com/ | head
+curl -sI https://richardwinfred.com/not-a-page | head
+```
+
+The first response is `200` over HTTPS. The second is a redirect to HTTPS. The third is `404` and still returns the branded not-found page. Then open `https://richardwinfred.com/` and `https://www.richardwinfred.com/` in a browser.
+
+### 8. Later updates
+
+From your own machine, in the site checkout:
+
+```bash
+./deploy/push.sh ubuntu@STATIC_IP
+```
+
+That replaces the files in `/var/www/richardwinfred` and reloads nginx. Run it when the checkout on your machine should become the live site. The Ubuntu user on Lightsail has passwordless sudo, which the script uses. It does not request a new certificate.
+
+### What the server does
+
+- nginx serves the files. HTML and 404 responses are not cached. Files under `assets/` cache for one day. Asset filenames are not hashed, so rename a file when replacing it if a one-day delay is a problem.
+- Response headers set a content security policy, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and `Permissions-Policy`. The policy allows Google Fonts and same-origin images, scripts, and styles. It does not allow a contact form post.
+- HSTS is off. Turn it on only after HTTPS has been confirmed on the real domain.
+- Take a Lightsail snapshot from the instance **Snapshots** tab after the first successful boot, so the finished server can be restored.
+
+### Other static hosts
+The same files can still be uploaded to any static host (cPanel `public_html`, Netlify, Cloudflare Pages). `index.html` has to be at the domain root. Those hosts will not apply the nginx headers in `deploy/nginx/`.
 
 ## Notes
 - Fonts load from Google Fonts (Fraunces + Inter). Site degrades gracefully to system fonts offline.
